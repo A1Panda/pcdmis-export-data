@@ -33,6 +33,8 @@ def argumentParser() -> argparse.Namespace:
     fileGroup.add_argument('-f', '--file', type=str, help='指定导出文件')
     fileGroup.add_argument('-fr', '--specifyfileatruntime', action='store_true', help='运行时指定导出文件')
     fileGroup.add_argument('-n', '--nospecified', action='store_true', help='不指定导出文件或目录')
+
+    parser.add_argument('--no-prog', action='store_true', help='不保存测量程序文件')
     return parser.parse_args()
 
 def generateExportFilePath(args: argparse.Namespace, version: str, name: str, serialNumber: str, timeTuple) -> tuple[str, str]:
@@ -152,17 +154,27 @@ def cmdMode():
         Dialog.log('取消选择文件夹或文件')
         return
     
+    Dialog.log(f'准备导出 Excel 文件到：{exportExcelFilePath}, 路径长度：{len(exportExcelFilePath)}')
+    exportExcelFilePath = CommonTools.longPath(exportExcelFilePath)
     ExcelTools.openExcel(exportExcelFilePath)
     nonconformingDimensions = ExcelTools.write(serialNumber, dataList, timeTuple)
+    Dialog.log(f'导出 Excel 文件成功')
 
-    print(f'exportProgramFilePath={exportProgramFilePath}')
-    if PcdmisTools.saveProg(): # 保存测量程序
-        shutil.copy2(PcdmisTools.getCurProgPath(), exportProgramFilePath) # 复制测量程序到指定目录
-        CommonTools.setFileReadOnly(exportProgramFilePath) # 设置测量程序只读
+    # 控制是否保存测量程序
+    if not args.no_prog:
+        if PcdmisTools.saveProg(): # 保存测量程序
+            Dialog.log(f'测量程序路径长度：{len(PcdmisTools.getCurProgPath())}')
+            Dialog.log(f'准备复制测量程序到：{exportProgramFilePath}，路径长度：{len(exportProgramFilePath)}')
+            srcProgPath = CommonTools.longPath(PcdmisTools.getCurProgPath())
+            dstProgPath = CommonTools.longPath(exportProgramFilePath)
 
-    executionTime = datetime.datetime.now() - startTime
-    msg = f'程序文件副本：{exportProgramFilePath}，导出 Excel 文件到：{exportProgramFilePath}，耗时：{executionTime}'
-    Dialog.log(msg)
+            try:
+                shutil.copy2(srcProgPath, dstProgPath) # 复制测量程序到指定目录
+                CommonTools.setFileReadOnly(dstProgPath) # 设置测量程序只读
+            except Exception as e:
+                Dialog.log(f'复制测量程序失败：\n{traceback.format_exc()}')
+            else:
+                Dialog.log(f'复制测量程序成功')
 
     row = f'{CommonTools.getTimeStamp(timeTuple, 0)},{fullProgramName},{nonconformingDimensions}\n'
     nonconformingDimensionsFile = constants.Path.nonconformingDimensionsFile + CommonTools.getTimeStamp(timeTuple, 1) + '.csv'
@@ -178,6 +190,10 @@ def cmdMode():
             f.write(row)
     CommonTools.setFileReadOnly(nonconformingDimensionsFile, True)
 
+    executionTime = datetime.datetime.now() - startTime
+    msg = f'耗时：{executionTime}'
+    Dialog.log(msg)
+
     # newConsolePrint(msg)
 
 def uiMode():
@@ -190,7 +206,7 @@ def uiMode():
     master.title(constants.Basic.projectName)
 
     width = 756
-    height = 290
+    height = 370
     defaultX = int((master.winfo_screenwidth() - width) / 2)
     defaultY = int((master.winfo_screenheight() - height) / 2)
     master.geometry(f'{width}x{height}+{defaultX}+{defaultY}')
