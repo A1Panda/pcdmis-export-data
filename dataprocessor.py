@@ -94,7 +94,7 @@ def calculateCsvDigest(dataRows):
         if len(row) >= 12:
             keyColumns = row[0:9]
             keyColumns.append(row[11])
-            rowStr = '|'.join(keyColumns)
+            rowStr = '|'.join(map(str, keyColumns))
             sha256.update(rowStr.encode('utf-8'))
     return sha256.hexdigest()
 
@@ -303,7 +303,6 @@ def convertPcdCsvToExcel(dataPath: str = '', csvFilePath: str = r'C:\Temp\PC-DMI
     fullProgName: str = metadata[2].strip() # 测量程序完整路径
     minusTolShowNeg: bool = (metadata[5].strip().lower() == 'true') # PC-DMIS 负公差显示负号设置值
     dataRows = cleanRawDataRows(rawDataRows)
-    currentDigest: str = calculateCsvDigest(dataRows)
 
     # 序列号
     serialNumber: str = metadata[3].strip() # 测量程序初始序列号
@@ -362,6 +361,14 @@ def convertPcdCsvToExcel(dataPath: str = '', csvFilePath: str = r'C:\Temp\PC-DMI
         ws = wb.active
         ws.title = sheetName
 
+    # 格式化指定小数位
+    formatDataPrecision(dataRows, decimalPlaces)
+    # 负公差负号处理
+    adjustMinusToleranceSign(dataRows, minusTolShowNeg)
+    # 转换轴成名称
+    axisLetterToName(dataRows)
+
+    currentDigest: str = calculateCsvDigest(dataRows)
     # 变更校验
     # ------------------------------------------------------------------------
     currentRow = ws.max_row
@@ -372,13 +379,6 @@ def convertPcdCsvToExcel(dataPath: str = '', csvFilePath: str = r'C:\Temp\PC-DMI
         currentRow += 1
     else:
         isModified = True
-
-    # 格式化指定小数位
-    formatDataPrecision(dataRows, decimalPlaces)
-    # 负公差负号处理
-    adjustMinusToleranceSign(dataRows, minusTolShowNeg)
-    # 转换轴成名称
-    axisLetterToName(dataRows)
 
     # 写表头
     # ------------------------------------------------------------------------
